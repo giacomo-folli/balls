@@ -1,7 +1,10 @@
 [package]
-name = "img-viz"
+name = "balls"
 version = "0.1.0"
 edition = "2024"
+
+[lib]
+path = "src/lib.rs"
 
 [dependencies]
 nannou = "0.19"

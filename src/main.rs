@@ -1,8 +1,5 @@
-use nannou::{prelude::*, window::KeyPressedFn};
-
-fn main() {
-    nannou::app(model).update(update).run();
-}
+// use balls::*;
+use nannou::prelude::*;
 
 const WIDTH: u32 = 800;
 const HEIGHT: u32 = 800;
@@ -11,9 +8,7 @@ const BOT_LIM: f32 = -(HEIGHT as f32 / 2.0) + PAD;
 const TOP_LIM: f32 = (HEIGHT as f32 / 2.0) - PAD;
 const LEF_LIM: f32 = -(WIDTH as f32 / 2.0) + PAD;
 const RIG_LIM: f32 = (WIDTH as f32 / 2.0) - PAD;
-
 const NO_OF_POINTS: usize = 30;
-// const PO_RAD: f32 = 25.0;
 
 #[derive(Clone)]
 struct Point {
@@ -45,6 +40,10 @@ impl Point {
     }
 }
 
+fn main() {
+    nannou::app(model).update(update).run();
+}
+
 fn model(app: &App) -> Model {
     let _window = app
         .new_window()
@@ -66,7 +65,7 @@ fn model(app: &App) -> Model {
     Model { points, rad: 25.0 }
 }
 
-fn key_pressed(app: &App, model: &mut Model, key: Key) {
+fn key_pressed(_app: &App, model: &mut Model, key: Key) {
     match key {
         Key::R => {
             for point in model.points.iter_mut() {
@@ -82,6 +81,26 @@ fn key_pressed(app: &App, model: &mut Model, key: Key) {
         Key::Up => {
             if model.rad < 40.0 {
                 model.rad += 1.0;
+            }
+        }
+        Key::Left => {
+            if model.points.len() > 1 {
+                model.points.pop();
+            }
+        }
+        Key::Right => {
+            if model.points.len() < 100 {
+                model.points.push(Point {
+                    position: vec2(0.0, 0.0),
+                    vel_x: [10.0, -10.0][random_range(0, 1)],
+                    vel_y: random_range(-1.5, 1.5),
+                    col: rgb(
+                        random_range(0u8, 255u8),
+                        random_range(0u8, 255u8),
+                        random_range(0u8, 255u8),
+                    ),
+                    resting: false,
+                });
             }
         }
         _other_key => {}
@@ -153,9 +172,22 @@ fn handle_wall_collisions(model: &mut Model) {
     }
 }
 
+// ball-to-ball interactions, collisions and stacking
 fn handle_balls_collisions(model: &mut Model) {
-    let e_loss = 0.98;
+    resolve_ball_collisions(model);
 
+    // Set up data for processing resting states
+    let positions: Vec<Vec2> = model.points.iter().map(|p| p.position).collect();
+    let mut resting: Vec<bool> = vec![false; model.points.len()];
+
+    mark_floor_resting_balls(model, &mut resting);
+    mark_stacked_resting_balls(model, &positions, &mut resting);
+}
+
+fn resolve_ball_collisions(model: &mut Model) {
+    let e_loss = 0.98; // Energy loss coefficient in collisions
+
+    // Process each pair of balls exactly once
     for i in 0..model.points.len() {
         let (left, right) = model.points.split_at_mut(i + 1);
         let a = &mut left[i];
@@ -174,7 +206,6 @@ fn handle_balls_collisions(model: &mut Model) {
                 let relative_velocity = b_vel - a_vel;
                 let vel_along_normal = relative_velocity.dot(normal);
 
-                // Standard collision response
                 if vel_along_normal < 0.0 {
                     let impulse = -vel_along_normal * e_loss;
                     let impulse_vec = normal * impulse;
@@ -185,7 +216,7 @@ fn handle_balls_collisions(model: &mut Model) {
                     b.vel_y += impulse_vec.y * 0.5;
                 }
 
-                // Position correction to prevent overlap
+                // Position correction to prevent balls from sinking into each other
                 let overlap = model.rad * 2.0 - distance;
                 if overlap > 0.01 {
                     let correction = normal * (overlap / 2.0);
@@ -193,7 +224,7 @@ fn handle_balls_collisions(model: &mut Model) {
                     a.position -= correction;
                     b.position += correction;
 
-                    // Clamp positions to screen boundaries
+                    // Ensure balls stay within screen boundaries
                     a.position.x = a.position.x.clamp(LEF_LIM + model.rad, RIG_LIM - model.rad);
                     a.position.y = a.position.y.clamp(BOT_LIM + model.rad, TOP_LIM - model.rad);
                     b.position.x = b.position.x.clamp(LEF_LIM + model.rad, RIG_LIM - model.rad);
@@ -202,15 +233,16 @@ fn handle_balls_collisions(model: &mut Model) {
             }
         }
     }
+}
 
-    // Create a copy of positions and resting states for the second pass
-    let positions: Vec<Vec2> = model.points.iter().map(|p| p.position).collect();
-    let mut resting: Vec<bool> = vec![false; model.points.len()];
-
+fn mark_floor_resting_balls(model: &mut Model, resting: &mut Vec<bool>) {
     for i in 0..model.points.len() {
         let point = &mut model.points[i];
 
-        // Check if ball is on the floor
+        // A ball is resting on the floor if:
+        // 1. It's very close to the floor
+        // 2. It has very little vertical velocity
+        // 3. It has very little horizontal velocity
         if point.position.y <= BOT_LIM + model.rad + 0.1
             && point.vel_y.abs() < 0.1
             && point.vel_x.abs() < 0.1
@@ -219,29 +251,26 @@ fn handle_balls_collisions(model: &mut Model) {
             resting[i] = true;
             point.vel_x = 0.0;
             point.vel_y = 0.0;
-            continue;
         }
     }
+}
 
-    // Third pass: check if balls are supported by other resting balls
-    // We need multiple passes to handle stacking correctly
+fn mark_stacked_resting_balls(model: &mut Model, positions: &Vec<Vec2>, resting: &mut Vec<bool>) {
     let mut changed = true;
     let mut pass_count = 0;
-    const MAX_PASSES: usize = 5; // Limit passes to avoid infinite loops
+    const MAX_PASSES: usize = 5;
 
     while changed && pass_count < MAX_PASSES {
         changed = false;
         pass_count += 1;
 
         for i in 0..model.points.len() {
-            // Skip already resting balls
             if resting[i] {
                 continue;
             }
 
             let point = &mut model.points[i];
 
-            // Check if ball is supported by other balls
             for j in 0..positions.len() {
                 if i == j || !resting[j] {
                     continue;
@@ -250,11 +279,11 @@ fn handle_balls_collisions(model: &mut Model) {
                 let delta = point.position - positions[j];
                 let distance = delta.length();
 
-                // Check if balls are touching
+                // balls are touching or very close
                 if distance <= model.rad * 2.0 + 0.1 {
                     let angle = delta.y.atan2(delta.x);
 
-                    // Check if the ball is approximately on top (within 30 degrees of vertical)
+                    // ball is approximately on top (within 30 degrees of vertical)
                     if angle > std::f32::consts::PI * 0.4
                         && angle < std::f32::consts::PI * 0.6
                         && point.vel_y.abs() < 0.2
@@ -262,7 +291,7 @@ fn handle_balls_collisions(model: &mut Model) {
                     {
                         point.resting = true;
                         resting[i] = true;
-                        point.vel_x *= 0.5; // Dampen horizontal movement but don't eliminate it
+                        point.vel_x *= 0.5;
                         point.vel_y = 0.0;
                         changed = true;
                         break;
