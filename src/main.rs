@@ -89,61 +89,36 @@ fn key_pressed(app: &App, model: &mut Model, key: Key) {
 }
 
 fn update(_app: &App, model: &mut Model, _update: Update) {
+    handle_wall_collisions(model);
+    handle_balls_collisions(model);
+}
+
+fn view(app: &App, model: &Model, frame: Frame) {
+    let draw = app.draw();
+
+    let win = app.window_rect().pad(PAD);
+    draw.rect().wh(win.wh()).color(BLACK);
+
+    draw.background().color(PLUM);
+
+    for point in model.points.iter() {
+        draw.ellipse()
+            .xy(point.position)
+            .radius(model.rad)
+            .color(point.col);
+    }
+
+    draw.to_frame(app, &frame).unwrap();
+}
+
+fn handle_wall_collisions(model: &mut Model) {
     let grav: f32 = -1.2;
     let e_loss = 0.9;
 
-    let other_points = model.points.clone();
+    // let other_points = model.points.clone();
     for point in model.points.iter_mut() {
         let mut y = point.position.y;
         let mut x = point.position.x;
-
-        // if point.position.y <= BOT_LIM + model.rad + 0.1
-        //     && point.vel_y.abs() < 0.15
-        //     && point.vel_x.abs() < 0.15
-        // {
-        //     point.resting = true;
-        //     point.vel_x = 0.0;
-        //     point.vel_y = 0.0;
-        //     continue;
-        // } else {
-        //     point.resting = false;
-        // }
-
-        // START
-
-        let near_floor = point.position.y <= BOT_LIM + model.rad + 0.1;
-        let slow = point.vel_y.abs() < 0.1 && point.vel_x.abs() < 0.1;
-        let mut supported = near_floor;
-
-        for other in other_points.iter() {
-            if other.position == point.position {
-                continue;
-            }
-
-            let vertical_gap = other.position.y - point.position.y;
-            let horizontal_dist = (other.position.x - point.position.x).abs();
-
-            if vertical_gap > 0.0
-                && vertical_gap < model.rad * 2.2
-                && horizontal_dist < model.rad * 1.5
-            {
-                if other.resting {
-                    supported = true;
-                    break;
-                }
-            }
-        }
-
-        if slow && supported {
-            point.resting = true;
-            point.vel_x = 0.0;
-            point.vel_y = 0.0;
-            continue;
-        } else {
-            point.resting = false;
-        }
-
-        // END
 
         y += point.vel_y;
         x += point.vel_x;
@@ -176,44 +151,22 @@ fn update(_app: &App, model: &mut Model, _update: Update) {
 
         point.position = vec2(x, y);
     }
-
-    handle_collisions(model);
 }
 
-fn view(app: &App, model: &Model, frame: Frame) {
-    let draw = app.draw();
-
-    let win = app.window_rect().pad(PAD);
-    draw.rect().wh(win.wh()).color(BLACK);
-
-    draw.background().color(PLUM);
-
-    for point in model.points.iter() {
-        draw.ellipse()
-            .xy(point.position)
-            .radius(model.rad)
-            .color(point.col);
-    }
-
-    draw.to_frame(app, &frame).unwrap();
-}
-
-fn handle_collisions(model: &mut Model) {
+fn handle_balls_collisions(model: &mut Model) {
     let e_loss = 0.98;
 
     for i in 0..model.points.len() {
         let (left, right) = model.points.split_at_mut(i + 1);
         let a = &mut left[i];
 
+        a.resting = false;
+
         for b in right {
             let delta = b.position - a.position;
             let distance = delta.length();
 
             if distance < model.rad * 2.0 {
-                if distance > model.rad * 2.0 - 0.05 {
-                    continue; // skip near-threshold overlap
-                }
-
                 let normal = delta.normalize_or_zero();
 
                 let a_vel = vec2(a.vel_x, a.vel_y);
@@ -221,36 +174,99 @@ fn handle_collisions(model: &mut Model) {
                 let relative_velocity = b_vel - a_vel;
                 let vel_along_normal = relative_velocity.dot(normal);
 
-                if vel_along_normal > 0.0 {
-                    continue;
+                // Standard collision response
+                if vel_along_normal < 0.0 {
+                    let impulse = -vel_along_normal * e_loss;
+                    let impulse_vec = normal * impulse;
+
+                    a.vel_x -= impulse_vec.x * 0.5;
+                    a.vel_y -= impulse_vec.y * 0.5;
+                    b.vel_x += impulse_vec.x * 0.5;
+                    b.vel_y += impulse_vec.y * 0.5;
                 }
 
-                if a.resting && (a.vel_x.abs() + a.vel_y.abs()) > 0.1 {
-                    a.resting = false;
-                }
-                if b.resting && (b.vel_x.abs() + b.vel_y.abs()) > 0.1 {
-                    b.resting = false;
-                }
-
-                let impulse = -vel_along_normal * e_loss;
-                let impulse_vec = normal * impulse;
-
-                a.vel_x -= impulse_vec.x * 0.5;
-                a.vel_y -= impulse_vec.y * 0.5;
-                b.vel_x += impulse_vec.x * 0.5;
-                b.vel_y += impulse_vec.y * 0.5;
-
-                if distance < model.rad * 2.0 - 0.01 {
-                    let overlap = model.rad * 2.0 - distance;
+                // Position correction to prevent overlap
+                let overlap = model.rad * 2.0 - distance;
+                if overlap > 0.01 {
                     let correction = normal * (overlap / 2.0);
 
                     a.position -= correction;
                     b.position += correction;
 
+                    // Clamp positions to screen boundaries
                     a.position.x = a.position.x.clamp(LEF_LIM + model.rad, RIG_LIM - model.rad);
                     a.position.y = a.position.y.clamp(BOT_LIM + model.rad, TOP_LIM - model.rad);
                     b.position.x = b.position.x.clamp(LEF_LIM + model.rad, RIG_LIM - model.rad);
                     b.position.y = b.position.y.clamp(BOT_LIM + model.rad, TOP_LIM - model.rad);
+                }
+            }
+        }
+    }
+
+    // Create a copy of positions and resting states for the second pass
+    let positions: Vec<Vec2> = model.points.iter().map(|p| p.position).collect();
+    let mut resting: Vec<bool> = vec![false; model.points.len()];
+
+    for i in 0..model.points.len() {
+        let point = &mut model.points[i];
+
+        // Check if ball is on the floor
+        if point.position.y <= BOT_LIM + model.rad + 0.1
+            && point.vel_y.abs() < 0.1
+            && point.vel_x.abs() < 0.1
+        {
+            point.resting = true;
+            resting[i] = true;
+            point.vel_x = 0.0;
+            point.vel_y = 0.0;
+            continue;
+        }
+    }
+
+    // Third pass: check if balls are supported by other resting balls
+    // We need multiple passes to handle stacking correctly
+    let mut changed = true;
+    let mut pass_count = 0;
+    const MAX_PASSES: usize = 5; // Limit passes to avoid infinite loops
+
+    while changed && pass_count < MAX_PASSES {
+        changed = false;
+        pass_count += 1;
+
+        for i in 0..model.points.len() {
+            // Skip already resting balls
+            if resting[i] {
+                continue;
+            }
+
+            let point = &mut model.points[i];
+
+            // Check if ball is supported by other balls
+            for j in 0..positions.len() {
+                if i == j || !resting[j] {
+                    continue;
+                }
+
+                let delta = point.position - positions[j];
+                let distance = delta.length();
+
+                // Check if balls are touching
+                if distance <= model.rad * 2.0 + 0.1 {
+                    let angle = delta.y.atan2(delta.x);
+
+                    // Check if the ball is approximately on top (within 30 degrees of vertical)
+                    if angle > std::f32::consts::PI * 0.4
+                        && angle < std::f32::consts::PI * 0.6
+                        && point.vel_y.abs() < 0.2
+                        && point.vel_x.abs() < 0.2
+                    {
+                        point.resting = true;
+                        resting[i] = true;
+                        point.vel_x *= 0.5; // Dampen horizontal movement but don't eliminate it
+                        point.vel_y = 0.0;
+                        changed = true;
+                        break;
+                    }
                 }
             }
         }
