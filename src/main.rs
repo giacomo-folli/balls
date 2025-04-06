@@ -1,4 +1,3 @@
-// use balls::*;
 use nannou::prelude::*;
 
 const WIDTH: u32 = 800;
@@ -172,22 +171,63 @@ fn handle_wall_collisions(model: &mut Model) {
     }
 }
 
-// ball-to-ball interactions, collisions and stacking
 fn handle_balls_collisions(model: &mut Model) {
+    for _ in 0..3 {
+        // Multiple iterations to ensure overlaps are fully resolved
+        resolve_ball_penetrations(model);
+    }
+
+    // Then handle velocity changes from collisions
     resolve_ball_collisions(model);
 
-    // Set up data for processing resting states
+    // Set up data for processing rest states
     let positions: Vec<Vec2> = model.points.iter().map(|p| p.position).collect();
     let mut resting: Vec<bool> = vec![false; model.points.len()];
 
+    // Mark balls that are resting on the floor
     mark_floor_resting_balls(model, &mut resting);
+
+    // Then iteratively find balls resting on other balls
     mark_stacked_resting_balls(model, &positions, &mut resting);
 }
 
-fn resolve_ball_collisions(model: &mut Model) {
-    let e_loss = 0.98; // Energy loss coefficient in collisions
+fn resolve_ball_penetrations(model: &mut Model) {
+    for i in 0..model.points.len() {
+        let (left, right) = model.points.split_at_mut(i + 1);
+        let a = &mut left[i];
 
-    // Process each pair of balls exactly once
+        for b in right {
+            let delta = b.position - a.position;
+            let distance = delta.length();
+
+            if distance < model.rad * 2.0 - 0.001 {
+                let normal = if distance > 0.001 {
+                    delta.normalize()
+                } else {
+                    // If balls are exactly at the same position, move in random direction
+                    let angle = random_range(0.0, std::f32::consts::PI * 2.0);
+                    Vec2::new(angle.cos(), angle.sin())
+                };
+
+                // Calculate and apply position correction
+                let overlap = model.rad * 2.0 - distance;
+                let correction = normal * overlap;
+
+                a.position -= correction * 0.5;
+                b.position += correction * 0.5;
+
+                a.position.x = a.position.x.clamp(LEF_LIM + model.rad, RIG_LIM - model.rad);
+                a.position.y = a.position.y.clamp(BOT_LIM + model.rad, TOP_LIM - model.rad);
+                b.position.x = b.position.x.clamp(LEF_LIM + model.rad, RIG_LIM - model.rad);
+                b.position.y = b.position.y.clamp(BOT_LIM + model.rad, TOP_LIM - model.rad);
+            }
+        }
+    }
+}
+
+fn resolve_ball_collisions(model: &mut Model) {
+    let e_loss = 0.98;
+
     for i in 0..model.points.len() {
         let (left, right) = model.points.split_at_mut(i + 1);
         let a = &mut left[i];
@@ -198,7 +238,7 @@ fn resolve_ball_collisions(model: &mut Model) {
             let delta = b.position - a.position;
             let distance = delta.length();
 
-            if distance < model.rad * 2.0 {
+            if distance < model.rad * 2.0 + 0.1 {
                 let normal = delta.normalize_or_zero();
 
                 let a_vel = vec2(a.vel_x, a.vel_y);
@@ -214,21 +254,6 @@ fn resolve_ball_collisions(model: &mut Model) {
                     a.vel_y -= impulse_vec.y * 0.5;
                     b.vel_x += impulse_vec.x * 0.5;
                     b.vel_y += impulse_vec.y * 0.5;
-                }
-
-                // Position correction to prevent balls from sinking into each other
-                let overlap = model.rad * 2.0 - distance;
-                if overlap > 0.01 {
-                    let correction = normal * (overlap / 2.0);
-
-                    a.position -= correction;
-                    b.position += correction;
-
-                    // Ensure balls stay within screen boundaries
-                    a.position.x = a.position.x.clamp(LEF_LIM + model.rad, RIG_LIM - model.rad);
-                    a.position.y = a.position.y.clamp(BOT_LIM + model.rad, TOP_LIM - model.rad);
-                    b.position.x = b.position.x.clamp(LEF_LIM + model.rad, RIG_LIM - model.rad);
-                    b.position.y = b.position.y.clamp(BOT_LIM + model.rad, TOP_LIM - model.rad);
                 }
             }
         }
@@ -279,11 +304,10 @@ fn mark_stacked_resting_balls(model: &mut Model, positions: &Vec<Vec2>, resting:
                 let delta = point.position - positions[j];
                 let distance = delta.length();
 
-                // balls are touching or very close
                 if distance <= model.rad * 2.0 + 0.1 {
                     let angle = delta.y.atan2(delta.x);
 
-                    // ball is approximately on top (within 30 degrees of vertical)
+                    // Check if the ball is approximately on top (within 30 degrees of vertical)
                     if angle > std::f32::consts::PI * 0.4
                         && angle < std::f32::consts::PI * 0.6
                         && point.vel_y.abs() < 0.2
