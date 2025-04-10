@@ -1,6 +1,7 @@
 # Balls
 
 This project is a simulation of bouncing balls built using the `nannou` crate.
+![output gif](/output1.gif)
 
 ## How to Run
 
