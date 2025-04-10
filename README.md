@@ -29,5 +29,7 @@ Here's a quick look at the simulation in action:
 ## New Stuff
 
 - Add more advanced collision detection.
-- Implement different shapes.
-- Add sound effects.
+- Let shape change over time.
+- Load a soundtrack and make the balls react to its frequencies.
+- Allow user customization in a .yaml file (keep it simple).
+- Add more rooms (balls room, sqares room, etc...)
