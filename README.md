@@ -1,6 +1,8 @@
 # Balls
 
-This project is a simulation of bouncing balls built using the `nannou` crate.
+This project is a simulation of bouncing balls created with the `nannou` crate. It's a simple project to to learn some basic physics and graphics concepts.
+
+Here's a quick look at the simulation in action:
 ![output gif](/output1.gif)
 
 ## How to Run
