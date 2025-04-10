@@ -147,6 +147,12 @@ fn handle_wall_collisions(model: &mut Model) {
             point.vel_x *= e_loss;
         }
 
+        if y >= TOP_LIM - model.rad {
+            y = TOP_LIM - model.rad;
+            point.vel_y = -point.vel_y * e_loss;
+            // No energy loss when collision is with top border
+        }
+
         if x <= LEF_LIM + model.rad {
             x = LEF_LIM + model.rad;
             point.vel_x = -point.vel_x * e_loss;
