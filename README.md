@@ -3,7 +3,7 @@
 This project is a simulation of bouncing balls created with the `nannou` crate. It's a simple project to to learn some basic physics and graphics concepts.
 
 Here's a quick look at the simulation in action:
-![output gif](/output1.gif)
+![demo gif](https://raw.githubusercontent.com/giacomo-folli/balls/master/output1.gif)
 
 ## How to Run
 
@@ -20,7 +20,13 @@ Here's a quick look at the simulation in action:
 - `Left`: Remove a ball.
 - `Right`: Add a ball.
 
-## Next Steps
+## Fixes
+
+- Physics logic rewrite
+- Jitter in balls when they are close to each other
+- Add collision handling to top wall too
+
+## New Stuff
 
 - Add more advanced collision detection.
 - Implement different shapes.
