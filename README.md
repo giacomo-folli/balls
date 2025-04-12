@@ -23,8 +23,8 @@ Here's a quick look at the simulation in action:
 ## Fixes
 
 - Physics logic rewrite
-- Jitter in balls when they are close to each other
-- Add collision handling to top wall too
+- Fix jitter when objects are close to each other
+- Add collision handling to top wall too ✅
 
 ## New Stuff
 
