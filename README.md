@@ -22,16 +22,18 @@ Here's a quick look at the simulation in action:
 
 ## Fixes
 
-- Physics logic rewrite
-- Fix jitter when objects are close to each other
-- Add collision handling to top wall too ✅
+| Task | Status |
+|:--|:---|
+|Physics logic rewrite.| To do|
+|Fix jitter when objects are close to each others.| To do|
+|Add collision handling to top wall too.|Done ✅|
 
 ## New Stuff
-|--|--|
-|--|
-|Task|Status|
-- Add more advanced collision detection.
-- Let shape change over time.
-- Load a soundtrack and make the balls react to its frequencies.
-- Allow user customization in a .yaml file (keep it simple).
-- Add more rooms (balls room, sqares room, etc...)
+
+| Task | Status |
+|:--|:--|
+|Add more advanced collision detection.| To do|
+|Let shape change over time.| To do|
+|Load a soundtrack and make the balls react to its frequencies.| To do|
+|Allow user customization in a .yaml file (keep it simple).| To do|
+|Add more rooms (balls room, sqares room, etc...)|To do|
