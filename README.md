@@ -27,7 +27,9 @@ Here's a quick look at the simulation in action:
 - Add collision handling to top wall too ✅
 
 ## New Stuff
-
+|--|--|
+|--|
+|Task|Status|
 - Add more advanced collision detection.
 - Let shape change over time.
 - Load a soundtrack and make the balls react to its frequencies.
