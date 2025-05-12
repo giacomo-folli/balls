@@ -10,31 +10,55 @@ const RIG_LIM: f32 = (WIDTH as f32 / 2.0) - PAD;
 const NO_OF_POINTS: usize = 30;
 
 #[derive(Clone)]
-struct Point {
+struct Particle {
     position: Vec2,
-    vel_x: f32,
-    vel_y: f32,
+    velocity: Vec2,
+    mass: i8,
+    rad: f32,
     col: Rgb8,
     resting: bool,
+    vel_x: f32, // deprecated
+    vel_y: f32, // deprecated
 }
 
 struct Model {
-    points: Vec<Point>,
+    particles: Vec<Particle>,
     rad: f32,
 }
 
-impl Point {
+impl Particle {
     pub fn new(p: Vec2) -> Self {
-        Point {
+        Particle {
             position: p,
-            vel_x: [10.0, -10.0][random_range(0, 1)],
-            vel_y: random_range(-1.5, 1.5),
+            velocity: Vec2::new([10.0, -10.0][random_range(0, 1)], random_range(-1.5, 1.5)),
             col: rgb(
                 random_range(0u8, 255u8),
                 random_range(0u8, 255u8),
                 random_range(0u8, 255u8),
             ),
             resting: false,
+            mass: 2,
+            rad: 20.0,
+            vel_y: random_range(-1.5, 1.5),           // deprecated
+            vel_x: [10.0, -10.0][random_range(0, 1)], // deprecated
+        }
+    }
+
+    pub fn edges(mut self) {
+        if (self.position.x > width - self.r) {
+            self.position.x = width - self.r;
+            self.velocity.x *= -1;
+        } else if (self.position.x < self.r) {
+            self.position.x = self.r;
+            self.velocity.x *= -1;
+        }
+
+        if (self.position.y > height - self.r) {
+            self.position.y = height - self.r;
+            self.velocity.y *= -1;
+        } else if (self.position.y < self.r) {
+            self.position.y = self.r;
+            self.velocity.y *= -1;
         }
     }
 }
@@ -52,22 +76,25 @@ fn model(app: &App) -> Model {
         .build()
         .unwrap();
 
-    let mut points: Vec<Point> = Vec::new();
+    let mut points: Vec<Particle> = Vec::new();
 
     for _ in 0..NO_OF_POINTS {
-        points.push(Point::new(vec2(
+        points.push(Particle::new(vec2(
             random_range(LEF_LIM + 50.0, RIG_LIM - 50.0),
             0.0,
         )));
     }
 
-    Model { points, rad: 25.0 }
+    Model {
+        particles: points,
+        rad: 25.0,
+    }
 }
 
 fn key_pressed(_app: &App, model: &mut Model, key: Key) {
     match key {
         Key::R => {
-            for point in model.points.iter_mut() {
+            for point in model.particles.iter_mut() {
                 point.vel_y += 20.0;
                 point.vel_x += random_range(-20.0, 20.0);
             }
@@ -83,13 +110,13 @@ fn key_pressed(_app: &App, model: &mut Model, key: Key) {
             }
         }
         Key::Left => {
-            if model.points.len() > 1 {
-                model.points.pop();
+            if model.particles.len() > 1 {
+                model.particles.pop();
             }
         }
         Key::Right => {
-            if model.points.len() < 100 {
-                model.points.push(Point {
+            if model.particles.len() < 100 {
+                model.particles.push(Particle {
                     position: vec2(0.0, 0.0),
                     vel_x: [10.0, -10.0][random_range(0, 1)],
                     vel_y: random_range(-1.5, 1.5),
@@ -99,6 +126,9 @@ fn key_pressed(_app: &App, model: &mut Model, key: Key) {
                         random_range(0u8, 255u8),
                     ),
                     resting: false,
+                    velocity: Vec2::new([10.0, -10.0][random_range(0, 1)], random_range(-1.5, 1.5)),
+                    mass: 2,
+                    rad: 20.0,
                 });
             }
         }
@@ -119,7 +149,7 @@ fn view(app: &App, model: &Model, frame: Frame) {
 
     draw.background().color(PLUM);
 
-    for point in model.points.iter() {
+    for point in model.particles.iter() {
         draw.ellipse()
             .xy(point.position)
             .radius(model.rad)
@@ -134,7 +164,7 @@ fn handle_wall_collisions(model: &mut Model) {
     let e_loss = 0.9;
 
     // let other_points = model.points.clone();
-    for point in model.points.iter_mut() {
+    for point in model.particles.iter_mut() {
         let mut y = point.position.y;
         let mut x = point.position.x;
 
@@ -187,8 +217,8 @@ fn handle_balls_collisions(model: &mut Model) {
     resolve_ball_collisions(model);
 
     // Set up data for processing rest states
-    let positions: Vec<Vec2> = model.points.iter().map(|p| p.position).collect();
-    let mut resting: Vec<bool> = vec![false; model.points.len()];
+    let positions: Vec<Vec2> = model.particles.iter().map(|p| p.position).collect();
+    let mut resting: Vec<bool> = vec![false; model.particles.len()];
 
     // Mark balls that are resting on the floor
     mark_floor_resting_balls(model, &mut resting);
@@ -198,8 +228,8 @@ fn handle_balls_collisions(model: &mut Model) {
 }
 
 fn resolve_ball_penetrations(model: &mut Model) {
-    for i in 0..model.points.len() {
-        let (left, right) = model.points.split_at_mut(i + 1);
+    for i in 0..model.particles.len() {
+        let (left, right) = model.particles.split_at_mut(i + 1);
         let a = &mut left[i];
 
         for b in right {
@@ -234,8 +264,8 @@ fn resolve_ball_penetrations(model: &mut Model) {
 fn resolve_ball_collisions(model: &mut Model) {
     let e_loss = 0.98;
 
-    for i in 0..model.points.len() {
-        let (left, right) = model.points.split_at_mut(i + 1);
+    for i in 0..model.particles.len() {
+        let (left, right) = model.particles.split_at_mut(i + 1);
         let a = &mut left[i];
 
         a.resting = false;
@@ -267,8 +297,8 @@ fn resolve_ball_collisions(model: &mut Model) {
 }
 
 fn mark_floor_resting_balls(model: &mut Model, resting: &mut Vec<bool>) {
-    for i in 0..model.points.len() {
-        let point = &mut model.points[i];
+    for i in 0..model.particles.len() {
+        let point = &mut model.particles[i];
 
         // A ball is resting on the floor if:
         // 1. It's very close to the floor
@@ -295,12 +325,12 @@ fn mark_stacked_resting_balls(model: &mut Model, positions: &Vec<Vec2>, resting:
         changed = false;
         pass_count += 1;
 
-        for i in 0..model.points.len() {
+        for i in 0..model.particles.len() {
             if resting[i] {
                 continue;
             }
 
-            let point = &mut model.points[i];
+            let point = &mut model.particles[i];
 
             for j in 0..positions.len() {
                 if i == j || !resting[j] {
