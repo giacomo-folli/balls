@@ -5,14 +5,16 @@ This project is a simulation of bouncing balls created with the `nannou` crate. 
 Here's a quick look at the simulation in action:
 ![demo gif](https://raw.githubusercontent.com/giacomo-folli/balls/master/output1.gif)
 
-## How to Run
+## Quick Start
 
 1.  Make sure you have Rust installed. You can download it from [https://www.rust-lang.org/](https://www.rust-lang.org/).
 2.  Clone the repository.
 3.  Navigate to the project directory.
 4.  Run the project using `cargo run`.
 
-## Controls
+## Usage
+
+#### Controls
 
 - `R`: Add vertical velocity to all balls.
 - `Down`: Decrease the radius of the balls.
@@ -28,7 +30,10 @@ Here's a quick look at the simulation in action:
 |Fix jitter when objects are close to each others.| To do|
 |Add collision handling to top wall too.|Done ✅|
 
-## New Stuff
+## Contributing
+Every contribution is welcome!!
+
+## Roadmap
 
 | Task | Status |
 |:--|:--|
